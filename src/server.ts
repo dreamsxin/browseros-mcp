@@ -12,12 +12,35 @@ import { launchChrome } from './chrome-launch.js'
 import type { ServerConfig, BackendMode } from './config.js'
 
 /**
- * Detect backend mode by probing the connected browser.
- * BrowserOS reports "BrowserOS/xxx" in the Browser field; standard Chrome reports "Chrome/xxx".
+ * Detect backend mode by probing the CDP connection for BrowserOS-specific methods.
+ *
+ * The /json/version "Browser" field is unreliable because BrowserOS builds may
+ * not apply the BRANDING file at compile time, causing it to report "Chrome/xxx"
+ * even on BrowserOS. Instead, we probe the live CDP connection:
+ *
+ *   Browser.getTabs  — a BrowserOS custom CDP domain method.
+ *   If it succeeds → BrowserOS; if it errors (method not found) → standard Chrome.
+ *
+ * As a fallback, we also check the Browser string for "BrowserOS" (covers builds
+ * that DID apply the BRANDING file).
  */
-function detectBackend(browserString: string | undefined): 'browseros' | 'chrome' {
-  if (!browserString) return 'chrome'
-  return browserString.toLowerCase().includes('browseros') ? 'browseros' : 'chrome'
+async function detectBackend(
+  cdp: CdpConnectionImpl,
+  browserString: string | undefined,
+): Promise<'browseros' | 'chrome'> {
+  // Fast path: if the BRANDING file was applied, the Browser field contains "BrowserOS"
+  if (browserString?.toLowerCase().includes('browseros')) {
+    return 'browseros'
+  }
+
+  // Probe: try a BrowserOS-specific CDP method
+  try {
+    await cdp.Browser.getTabs({ includeHidden: true })
+    return 'browseros'
+  } catch {
+    // Method not found → standard Chrome
+    return 'chrome'
+  }
 }
 
 /**
@@ -48,13 +71,15 @@ export async function createHttpServer(config: ServerConfig): Promise<void> {
   // 3. Resolve backend mode (narrow to 'browseros' | 'chrome' — 'auto' is resolved here)
   let backend: 'browseros' | 'chrome'
   if (config.backend === 'auto') {
-    backend = detectBackend(cdp.versionInfo?.Browser)
+    backend = await detectBackend(cdp, cdp.versionInfo?.Browser)
     console.error(`[browseros-mcp] Auto-detected backend: ${backend}`)
   } else {
     backend = config.backend
     console.error(`[browseros-mcp] Backend mode: ${backend}`)
   }
   dbg(`Browser: ${cdp.versionInfo?.Browser ?? 'unknown'}`)
+  const browserStr = cdp.versionInfo?.Browser
+  dbg(`Detection: ${browserStr?.toLowerCase().includes('browseros') ? 'BRANDING match' : 'CDP probe (Browser.getTabs)'}`)
 
   // 4. Create BrowserSession with backend mode
   const session = new BrowserSession(cdp, { backend })
