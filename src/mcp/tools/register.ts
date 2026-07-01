@@ -1,5 +1,5 @@
 import type { BrowserSession } from '../../browser/session'
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp'
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { ZodRawShape } from 'zod'
 import { executeTool, type BackendMode } from './framework'
 import {

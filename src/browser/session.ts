@@ -43,6 +43,11 @@ export class BrowserSession {
           await this.frames.registerPage(session, pageId, sessionId)
           await hooks.onSessionAttached?.(session, pageId, sessionId)
         },
+        onPageDetached: (pageId) => {
+          this.observers.delete(pageId)
+          this.frames.unregisterPage(pageId)
+          hooks.onPageDetached?.(pageId)
+        },
       },
       backend,
     )

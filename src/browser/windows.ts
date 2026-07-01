@@ -60,12 +60,19 @@ export class WindowManager {
 
   async setVisibility(
     windowId: number,
-    visible: boolean,
+    opts: { visible: boolean; activate?: boolean },
   ): Promise<SetWindowVisibilityResult> {
     if (this.backend === 'chrome') throw UNSUPPORTED('setVisibility')
     await this.ensureConnected()
-    const result = await this.cdp.Browser.setWindowVisibility({ windowId, visible })
-    return result as SetWindowVisibilityResult
+    const result = await this.cdp.Browser.setWindowVisibility({
+      windowId,
+      visible: opts.visible,
+      ...(opts.activate !== undefined && { activate: opts.activate }),
+    })
+    return {
+      ...result,
+      newWindowId: result.window.windowId,
+    } as SetWindowVisibilityResult
   }
 
   private async ensureConnected(): Promise<void> {

@@ -1,4 +1,5 @@
-import type { DomainApi, ProtocolApi, Unsubscribe } from './types.js'
+import type { DomainApi, Unsubscribe } from './types.js'
+import type { ProtocolApi } from './generated/protocol-api.js'
 
 /**
  * Raw send function: (method, params?) → Promise<result>

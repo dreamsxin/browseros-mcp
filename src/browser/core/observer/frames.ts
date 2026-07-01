@@ -26,8 +26,10 @@ export interface FrameTarget {
 export class FrameRegistry {
   private readonly oopifSessions = new Map<FrameId, SessionId>()
   private readonly pageSessions = new Map<number, SessionId>()
+  private connectionEpoch: number
 
   constructor(private readonly cdp: CdpConnection) {
+    this.connectionEpoch = cdp.connectionEpoch()
     this.cdp.Target.on('attachedToTarget', (params) => {
       void this.onAttached(params as AttachedParams)
     })
@@ -42,6 +44,7 @@ export class FrameRegistry {
     pageId: number,
     sessionId: SessionId,
   ): Promise<void> {
+    this.ensureFreshConnection()
     this.pageSessions.set(pageId, sessionId)
     await pageSession.Target.setAutoAttach({
       autoAttach: true,
@@ -58,6 +61,7 @@ export class FrameRegistry {
     pageId: number,
     frameId: FrameId | undefined,
   ): FrameTarget {
+    this.ensureFreshConnection()
     const pageSessionId = this.pageSessions.get(pageId)
     if (pageSessionId === undefined) {
       throw new Error(`Page ${pageId} has no attached session`)
@@ -70,6 +74,18 @@ export class FrameRegistry {
       return { session: this.cdp.session(oopif), axParams: {} }
     }
     return { session: this.cdp.session(pageSessionId), axParams: { frameId } }
+  }
+
+  unregisterPage(pageId: number): void {
+    this.pageSessions.delete(pageId)
+  }
+
+  private ensureFreshConnection(): void {
+    const epoch = this.cdp.connectionEpoch()
+    if (epoch === this.connectionEpoch) return
+    this.connectionEpoch = epoch
+    this.pageSessions.clear()
+    this.oopifSessions.clear()
   }
 
   private async onAttached(params: AttachedParams): Promise<void> {

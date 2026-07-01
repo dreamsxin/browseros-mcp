@@ -98,6 +98,45 @@ Probes the connected browser's `/json/version` response:
 | `evaluate` | Evaluate JavaScript on a page | ✅ | ✅ |
 | `run` | Run JavaScript with browser SDK access | ✅ | ✅ |
 
+### Snapshot refs and page actions
+
+The `snapshot` tool is the main page-interaction contract. It captures the
+page Accessibility Tree, renders actionable elements with stable handles like
+`[ref=e12]`, and stores the ref map for that page. Tools that operate on
+specific elements use those refs instead of CSS selectors:
+
+- `act` uses refs for `click`, `fill`, `hover`, `focus`, `check`, `uncheck`,
+  `select`, `scroll`, and `drag`.
+- `download` clicks a snapshot ref to trigger the download.
+- `upload` resolves a snapshot ref for an `<input type=file>`.
+- `grep` with `over="ax"` searches snapshot lines and returns matching refs.
+- `screenshot` with `annotate=true` takes a fresh snapshot and paints the ref
+  numbers onto the image.
+
+The usual loop is:
+
+```text
+tabs list -> snapshot -> act(ref=eN) -> diff -> act(...) -> diff
+```
+
+`snapshot` and `diff` update the page observer state. `navigate` automatically
+returns a fresh snapshot because navigation invalidates old refs, and `act`
+automatically returns a diff so the caller can see the effect of the action.
+If the DOM changes substantially, call `snapshot` again before reusing refs.
+
+## MCP Prompts
+
+The server registers one discoverable MCP prompt:
+
+| Prompt | Description | Arguments |
+|--------|-------------|-----------|
+| `browser-automation` | BrowserOS observe-act-verify guidance for browser tasks. | `task` (optional string) |
+
+Clients that support MCP prompts, such as Claude Desktop, can list prompts and
+select `browser-automation` to insert the browser workflow guidance into a
+conversation. The optional `task` argument appends a concrete browser task to
+the prompt.
+
 ## Usage with MCP Clients
 
 ### Cursor / Claude Desktop

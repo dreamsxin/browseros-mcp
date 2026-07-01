@@ -27,5 +27,12 @@ export type { BrowserSessionOptions, BrowserSessionHooks } from './browser/sessi
 
 export { createBrowserMcpServer } from './mcp/mcp-server.js'
 export type { BrowserMcpServerOptions } from './mcp/mcp-server.js'
+export {
+  BROWSER_AUTOMATION_PROMPT_DESCRIPTION,
+  BROWSER_AUTOMATION_PROMPT_NAME,
+  BROWSER_AUTOMATION_PROMPT_TITLE,
+  BROWSER_MCP_INSTRUCTIONS,
+  buildBrowserAutomationPrompt,
+} from './mcp/mcp-prompt.js'
 
 export { launchChrome } from './chrome-launch.js'

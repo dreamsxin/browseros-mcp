@@ -57,23 +57,76 @@ export const DEFAULT_CONFIG: ServerConfig = {
   debug: false,
 }
 
+const BACKEND_MODES = new Set<BackendMode>(['browseros', 'chrome', 'auto'])
+
+function isPresent(value: unknown): boolean {
+  return value !== undefined && value !== null && value !== ''
+}
+
+function parseInteger(value: unknown, name: string): number {
+  const number = Number(value)
+  if (!Number.isInteger(number)) {
+    throw new Error(`${name} must be an integer.`)
+  }
+  return number
+}
+
+function parsePort(value: unknown, name: string): number {
+  const port = parseInteger(value, name)
+  if (port < 1 || port > 65535) {
+    throw new Error(`${name} must be between 1 and 65535.`)
+  }
+  return port
+}
+
+function parseBackend(value: unknown, name: string): BackendMode {
+  const backend = String(value)
+  if (!BACKEND_MODES.has(backend as BackendMode)) {
+    throw new Error(`${name} must be one of: browseros, chrome, auto.`)
+  }
+  return backend as BackendMode
+}
+
+function validateConfig(config: ServerConfig): ServerConfig {
+  parsePort(config.cdpPort, 'cdpPort')
+  parsePort(config.mcpPort, 'mcpPort')
+  parseBackend(config.backend, 'backend')
+  if (!config.cdpHost.trim()) throw new Error('cdpHost must not be empty.')
+  if (!config.serverName.trim()) throw new Error('serverName must not be empty.')
+  if (!config.serverTitle.trim()) throw new Error('serverTitle must not be empty.')
+  if (!config.serverVersion.trim()) throw new Error('serverVersion must not be empty.')
+  if (config.defaultWindowId !== undefined) {
+    parseInteger(config.defaultWindowId, 'defaultWindowId')
+  }
+  if (!Number.isInteger(config.cdpMaxRetries) || config.cdpMaxRetries < 1) {
+    throw new Error('cdpMaxRetries must be a positive integer.')
+  }
+  if (!Number.isFinite(config.cdpRetryDelay) || config.cdpRetryDelay < 0) {
+    throw new Error('cdpRetryDelay must be a non-negative number.')
+  }
+  if (!Number.isFinite(config.cdpFetchTimeout) || config.cdpFetchTimeout < 1) {
+    throw new Error('cdpFetchTimeout must be a positive number.')
+  }
+  return config
+}
+
 /**
  * Parse CLI arguments into a partial ServerConfig.
  */
 export function configFromArgs(args: Record<string, unknown>): Partial<ServerConfig> {
   const config: Partial<ServerConfig> = {}
 
-  if (args['cdp-port']) config.cdpPort = Number(args['cdp-port'])
-  if (args['cdp-host']) config.cdpHost = String(args['cdp-host'])
-  if (args['mcp-port']) config.mcpPort = Number(args['mcp-port'])
-  if (args['backend']) config.backend = String(args['backend']) as BackendMode
-  if (args['chrome-path']) config.chromePath = String(args['chrome-path'])
+  if (isPresent(args['cdp-port'])) config.cdpPort = parsePort(args['cdp-port'], '--cdp-port')
+  if (isPresent(args['cdp-host'])) config.cdpHost = String(args['cdp-host'])
+  if (isPresent(args['mcp-port'])) config.mcpPort = parsePort(args['mcp-port'], '--mcp-port')
+  if (isPresent(args['backend'])) config.backend = parseBackend(args['backend'], '--backend')
+  if (isPresent(args['chrome-path'])) config.chromePath = String(args['chrome-path'])
   if (args['auto-launch']) config.autoLaunch = true
-  if (args['name']) config.serverName = String(args['name'])
-  if (args['title']) config.serverTitle = String(args['title'])
-  if (args['version']) config.serverVersion = String(args['version'])
-  if (args['window-id']) config.defaultWindowId = Number(args['window-id'])
-  if (args['tab-group-id']) config.defaultTabGroupId = String(args['tab-group-id'])
+  if (isPresent(args['name'])) config.serverName = String(args['name'])
+  if (isPresent(args['title'])) config.serverTitle = String(args['title'])
+  if (isPresent(args['version'])) config.serverVersion = String(args['version'])
+  if (isPresent(args['window-id'])) config.defaultWindowId = parseInteger(args['window-id'], '--window-id')
+  if (isPresent(args['tab-group-id'])) config.defaultTabGroupId = String(args['tab-group-id'])
   if (args['debug']) config.debug = true
 
   return config
@@ -86,10 +139,10 @@ export function configFromEnv(): Partial<ServerConfig> {
   const config: Partial<ServerConfig> = {}
   const env = process.env
 
-  if (env.BROWSEROS_MCP_CDP_PORT) config.cdpPort = Number(env.BROWSEROS_MCP_CDP_PORT)
+  if (env.BROWSEROS_MCP_CDP_PORT) config.cdpPort = parsePort(env.BROWSEROS_MCP_CDP_PORT, 'BROWSEROS_MCP_CDP_PORT')
   if (env.BROWSEROS_MCP_CDP_HOST) config.cdpHost = env.BROWSEROS_MCP_CDP_HOST
-  if (env.BROWSEROS_MCP_MCP_PORT) config.mcpPort = Number(env.BROWSEROS_MCP_MCP_PORT)
-  if (env.BROWSEROS_MCP_BACKEND) config.backend = env.BROWSEROS_MCP_BACKEND as BackendMode
+  if (env.BROWSEROS_MCP_MCP_PORT) config.mcpPort = parsePort(env.BROWSEROS_MCP_MCP_PORT, 'BROWSEROS_MCP_MCP_PORT')
+  if (env.BROWSEROS_MCP_BACKEND) config.backend = parseBackend(env.BROWSEROS_MCP_BACKEND, 'BROWSEROS_MCP_BACKEND')
   if (env.BROWSEROS_MCP_CHROME_PATH) config.chromePath = env.BROWSEROS_MCP_CHROME_PATH
   if (env.BROWSEROS_MCP_AUTO_LAUNCH === '1') config.autoLaunch = true
   if (env.BROWSEROS_MCP_SERVER_NAME) config.serverName = env.BROWSEROS_MCP_SERVER_NAME
@@ -105,9 +158,9 @@ export function configFromEnv(): Partial<ServerConfig> {
 export function resolveConfig(
   args: Record<string, unknown> = {},
 ): ServerConfig {
-  return {
+  return validateConfig({
     ...DEFAULT_CONFIG,
     ...configFromEnv(),
     ...configFromArgs(args),
-  }
+  })
 }

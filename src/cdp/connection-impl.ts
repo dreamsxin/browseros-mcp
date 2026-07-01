@@ -19,7 +19,7 @@ interface CdpVersion {
 }
 
 const LOOPBACK_HOSTS = ['127.0.0.1', 'localhost', '[::1]'] as const
-type LoopbackHost = (typeof LOOPBACK_HOSTS)[number]
+const LOOPBACK_HOST_SET = new Set<string>([...LOOPBACK_HOSTS, '::1'])
 
 const CDP_CONNECT_TIMEOUT = 10_000
 const CDP_REQUEST_TIMEOUT = 30_000
@@ -30,6 +30,21 @@ const CDP_RECONNECT_MAX_RETRIES = 5
 const CDP_RECONNECT_DELAY = 2_000
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+function normalizeHost(host: string): string {
+  const trimmed = host.trim()
+  if (trimmed === '::1') return '[::1]'
+  return trimmed
+}
+
+function hostForUrl(host: string): string {
+  if (host.startsWith('[') && host.endsWith(']')) return host
+  return host.includes(':') ? `[${host}]` : host
+}
+
+function hostForUrlHostname(host: string): string {
+  return host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host
+}
 
 export interface CdpConnectionImplConfig {
   port: number
@@ -54,7 +69,8 @@ interface CdpConnectionImpl extends ProtocolApi {}
  */
 class CdpConnectionImpl implements CdpConnection {
   private port: number
-  private preferredHost: LoopbackHost | null = null
+  private configuredHost: string | null = null
+  private preferredHost: string | null = null
   private ws: WebSocket | null = null
   private messageId = 0
   private pending = new Map<number, PendingRequest>()
@@ -79,6 +95,7 @@ class CdpConnectionImpl implements CdpConnection {
 
   constructor(config: CdpConnectionImplConfig) {
     this.port = config.port
+    this.configuredHost = config.host ? normalizeHost(config.host) : null
     this.maxRetries = config.maxRetries ?? CDP_CONNECT_MAX_RETRIES
     this.retryDelay = config.retryDelay ?? CDP_RECONNECT_DELAY
     this.fetchTimeout = config.fetchTimeout ?? CDP_CONNECT_TIMEOUT
@@ -160,12 +177,23 @@ class CdpConnectionImpl implements CdpConnection {
     })
   }
 
-  private getDiscoveryHosts(): LoopbackHost[] {
-    if (!this.preferredHost) return [...LOOPBACK_HOSTS]
-    return [this.preferredHost, ...LOOPBACK_HOSTS.filter((h) => h !== this.preferredHost)]
+  private getDiscoveryHosts(): string[] {
+    const configuredHost = this.configuredHost
+    const explicitRemote =
+      configuredHost !== null &&
+      !LOOPBACK_HOST_SET.has(configuredHost)
+    if (explicitRemote) return [configuredHost]
+
+    const hosts = configuredHost
+      ? [configuredHost, ...LOOPBACK_HOSTS]
+      : [...LOOPBACK_HOSTS]
+    const ordered = this.preferredHost
+      ? [this.preferredHost, ...hosts]
+      : hosts
+    return [...new Set(ordered)]
   }
 
-  private async discoverVersion(): Promise<{ host: LoopbackHost; version: CdpVersion }> {
+  private async discoverVersion(): Promise<{ host: string; version: CdpVersion }> {
     const failures: string[] = []
 
     for (const host of this.getDiscoveryHosts()) {
@@ -179,11 +207,11 @@ class CdpConnectionImpl implements CdpConnection {
       }
     }
 
-    throw new Error(`CDP /json/version failed on all loopback hosts (${failures.join('; ')})`)
+    throw new Error(`CDP /json/version failed on all configured hosts (${failures.join('; ')})`)
   }
 
-  private async fetchVersionFromHost(host: LoopbackHost): Promise<CdpVersion> {
-    const response = await fetch(`http://${host}:${this.port}/json/version`, {
+  private async fetchVersionFromHost(host: string): Promise<CdpVersion> {
+    const response = await fetch(`http://${hostForUrl(host)}:${this.port}/json/version`, {
       signal: AbortSignal.timeout(this.fetchTimeout),
     })
     if (!response.ok) {
@@ -196,10 +224,10 @@ class CdpConnectionImpl implements CdpConnection {
     return { webSocketDebuggerUrl: version.webSocketDebuggerUrl, Browser: version.Browser }
   }
 
-  private resolveWebSocketUrl(wsUrl: string, host: LoopbackHost): string {
+  private resolveWebSocketUrl(wsUrl: string, host: string): string {
     try {
       const parsed = new URL(wsUrl)
-      parsed.hostname = host === '[::1]' ? '::1' : host
+      parsed.hostname = hostForUrlHostname(host)
       return parsed.toString()
     } catch {
       return wsUrl

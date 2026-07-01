@@ -1,7 +1,14 @@
 import type { BrowserSession } from '../browser/session'
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp'
-import { SetLevelRequestSchema } from '@modelcontextprotocol/sdk/types'
-import { BROWSER_MCP_INSTRUCTIONS } from './mcp-prompt'
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { SetLevelRequestSchema } from '@modelcontextprotocol/sdk/types.js'
+import { z } from 'zod'
+import {
+  BROWSER_AUTOMATION_PROMPT_DESCRIPTION,
+  BROWSER_AUTOMATION_PROMPT_NAME,
+  BROWSER_AUTOMATION_PROMPT_TITLE,
+  BROWSER_MCP_INSTRUCTIONS,
+  buildBrowserAutomationPrompt,
+} from './mcp-prompt'
 import {
   type BrowserToolDefaults,
   type BrowserToolRegistrationOptions,
@@ -36,6 +43,32 @@ export function createBrowserMcpServer(
   server.server.setRequestHandler(SetLevelRequestSchema, () => {
     return {}
   })
+
+  server.registerPrompt(
+    BROWSER_AUTOMATION_PROMPT_NAME,
+    {
+      title: BROWSER_AUTOMATION_PROMPT_TITLE,
+      description: BROWSER_AUTOMATION_PROMPT_DESCRIPTION,
+      argsSchema: {
+        task: z
+          .string()
+          .optional()
+          .describe('Optional browser task to include in the prompt.'),
+      },
+    },
+    ({ task }) => ({
+      description: BROWSER_AUTOMATION_PROMPT_DESCRIPTION,
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: buildBrowserAutomationPrompt(task),
+          },
+        },
+      ],
+    }),
+  )
 
   registerBrowserTools(
     server,
