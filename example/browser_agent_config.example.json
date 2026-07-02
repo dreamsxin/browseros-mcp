@@ -1,0 +1,8 @@
+{
+  "mcp_url": "http://127.0.0.1:3000/mcp",
+  "base_url": "https://api.deepseek.com",
+  "model": "deepseek-v4-flash",
+  "api_key": "your-api-key",
+  "temperature": 0,
+  "workspace_dir": "."
+}

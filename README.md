@@ -137,6 +137,88 @@ select `browser-automation` to insert the browser workflow guidance into a
 conversation. The optional `task` argument appends a concrete browser task to
 the prompt.
 
+## LangChain Test Agent
+
+The repository includes a Python smoke-test agent that connects to the MCP
+server, discovers browser tools, fetches the `browser-automation` MCP prompt,
+and calls an OpenAI-compatible chat model through LangChain.
+
+Install Python dependencies:
+
+```bash
+pip install langchain-openai langchain-core requests
+```
+
+Create `example/browser_agent_config.json` from
+`example/browser_agent_config.example.json` and fill in your model settings:
+
+```json
+{
+  "mcp_url": "http://127.0.0.1:3000/mcp",
+  "base_url": "https://api.deepseek.com",
+  "model": "deepseek-v4-flash",
+  "api_key": "your-api-key",
+  "temperature": 0,
+  "workspace_dir": "."
+}
+```
+
+The real config file is ignored by git. Command-line flags override environment
+variables, which override the config file.
+
+Start Chrome and this MCP server, then run the agent. Without a positional
+prompt, the script starts a persistent interactive session and keeps the MCP
+browser session plus chat history alive until you type `exit` or `quit`:
+
+```bash
+# In one terminal
+npm start -- --backend chrome --mcp-port 3000
+
+# In another terminal
+python example/browser_agent_langchain.py
+```
+
+You can also pass a one-shot task and exit after the model finishes:
+
+```bash
+python example/browser_agent_langchain.py "open https://example.com and summarize it"
+```
+
+The test agent also injects three local file tools for saving and inspecting
+test artifacts inside `workspace_dir`: `local_list_files`, `local_read_file`,
+and `local_write_file`. A fuller browser-plus-file test prompt is:
+
+```bash
+python example/browser_agent_langchain.py "打开 https://www.baidu.com/，总结页面主要内容，并保存到 outputs/baidu-summary.md，然后读回文件确认"
+```
+
+Interactive mode prints extra diagnostics by default so tool selection can be
+debugged while the model is running. The diagnostics include status transitions
+such as `thinking`, `model-returned`, `executing`, `tool-returned`, and
+`finalizing`; the approximate message size sent to the model; the latest input
+preview; response finish reason; token usage and prompt cache hit rate when the
+provider returns cache fields such as `prompt_cache_hit_tokens`; tool calls;
+tool-result previews; and warnings for suspicious patterns such as empty model
+responses, invalid tool calls, repeated identical calls, unknown tools, or extra
+inspection tools after a successful `read`. Use `--quiet` to reduce this output,
+or `--verbose` to enable the same diagnostics for one-shot prompts.
+
+Diagnostic lines are colorized by data type when stderr is an interactive
+terminal: status is cyan, model metadata is magenta, tool calls are yellow,
+tool results are green, MCP events are blue, configuration is gray, and warnings
+or errors are red. Use `--color always` or `--color never` to override automatic
+detection.
+
+If `--mcp-url` or `BROWSEROS_MCP_URL` is not provided, the script prompts for
+the MCP URL first and defaults to `http://127.0.0.1:3000/mcp`.
+
+For OpenAI-compatible local or proxy endpoints, update the config file or pass
+`--base-url` and `--model`, for example:
+
+```bash
+python example/browser_agent_langchain.py --base-url http://127.0.0.1:8000/v1 --model qwen2.5 "list tabs"
+```
+
 ## Usage with MCP Clients
 
 ### Cursor / Claude Desktop

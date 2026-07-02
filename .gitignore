@@ -13,3 +13,8 @@ Thumbs.db
 # Environment
 .env
 .env.local
+
+# Python
+__pycache__/
+*.py[cod]
+example/browser_agent_config.json
