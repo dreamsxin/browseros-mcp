@@ -3,6 +3,7 @@ import type { Viewport } from '../../cdp/generated/domains/page'
 import type { ProtocolApi } from '../../cdp/generated/protocol-api'
 import { z } from 'zod'
 import { defineTool } from './framework'
+import { screenshotAnnotationSchema } from './output-schemas'
 
 const DEFAULT_SCREENSHOT_FORMAT = 'jpeg'
 const DEFAULT_SCREENSHOT_QUALITY = 80
@@ -62,6 +63,12 @@ export const screenshot = defineTool({
       .boolean()
       .optional()
       .describe('Overlay numbered refs from a fresh snapshot. Defaults false.'),
+  }),
+  output: z.object({
+    page: z.number().int(),
+    format: screenshotFormat,
+    bytes: z.number().int(),
+    annotations: z.array(screenshotAnnotationSchema).optional(),
   }),
   annotations: { readOnlyHint: true },
   handler: async (args, ctx) => {

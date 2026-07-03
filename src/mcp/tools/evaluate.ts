@@ -22,6 +22,10 @@ export const evaluate = defineTool({
       .optional()
       .describe('Max evaluation time in ms (default 30000).'),
   }),
+  output: z.object({
+    page: z.number().int(),
+    value: z.unknown().optional(),
+  }),
   annotations: { openWorldHint: true },
   handler: async (args, ctx) => {
     const { session } = await ctx.session.pages.getSession(args.page)

@@ -10,6 +10,11 @@ export const navigate = defineTool({
     action: z.enum(['url', 'back', 'forward', 'reload']).default('url'),
     url: z.string().optional().describe('Required when action is "url".'),
   }),
+  output: z.object({
+    action: z.enum(['url', 'back', 'forward', 'reload']),
+    page: z.number().int(),
+    url: z.string(),
+  }),
   handler: async (args, ctx, response) => {
     const nav = ctx.session.nav(args.page)
     switch (args.action) {
@@ -33,7 +38,7 @@ export const navigate = defineTool({
     const origin =
       refreshed?.url ?? ctx.session.pages.getInfo(args.page)?.url ?? 'unknown'
     response.text(`navigated (${args.action}) -> ${origin}`)
-    response.data({ page: args.page, url: origin })
+    response.data({ action: args.action, page: args.page, url: origin })
     response.includeSnapshot(args.page)
     return undefined
   },

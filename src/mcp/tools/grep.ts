@@ -12,6 +12,12 @@ export const grep = defineTool({
     over: z.enum(['ax', 'content']).default('ax'),
     limit: z.number().optional().describe('Max matching lines (default 50).'),
   }),
+  output: z.object({
+    page: z.number().int(),
+    over: z.enum(['ax', 'content']),
+    count: z.number().int(),
+    matches: z.array(z.string()),
+  }),
   annotations: { readOnlyHint: true },
   handler: async (args, ctx) => {
     let regex: RegExp

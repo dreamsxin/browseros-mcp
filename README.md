@@ -219,6 +219,44 @@ For OpenAI-compatible local or proxy endpoints, update the config file or pass
 python example/browser_agent_langchain.py --base-url http://127.0.0.1:8000/v1 --model qwen2.5 "list tabs"
 ```
 
+### Local Agent Service
+
+`example/browser_agent_service.py` wraps the same LangChain + MCP logic in a
+small local HTTP service so browser UIs can reuse the agent loop instead of
+reimplementing tool-calling in JavaScript.
+
+It uses the same `example/browser_agent_config.json` file and Python
+dependencies as the CLI script, then exposes:
+
+- `GET /health`
+- `POST /api/chat`
+- `POST /api/reset`
+
+Start it after the MCP server:
+
+```bash
+# In one terminal
+npm start -- --backend chrome --mcp-port 3000
+
+# In another terminal
+python example/browser_agent_service.py --host 127.0.0.1 --port 8001
+```
+
+### Chrome Side Panel Extension
+
+The repo also includes a simple Chrome MV3 side-panel extension in
+`example/chrome-sidepanel-agent`. It connects to the local Python service,
+persists chat state in `chrome.storage.local`, and renders the agent's returned
+tool/diagnostic events in an execution trace panel.
+
+To try it:
+
+1. Start the MCP server and `python example/browser_agent_service.py`.
+2. Open `chrome://extensions`.
+3. Enable Developer Mode.
+4. Load `example/chrome-sidepanel-agent` as an unpacked extension.
+5. Click the extension icon to open the side panel.
+
 ## Usage with MCP Clients
 
 ### Cursor / Claude Desktop

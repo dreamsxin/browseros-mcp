@@ -1,6 +1,7 @@
 import type { TabGroup } from '../../browser/tab-groups'
 import { z } from 'zod'
 import { defineTool, errorResult, textResult } from './framework'
+import { tabGroupWithPagesSchema } from './output-schemas'
 
 const TAB_GROUP_COLORS = [
   'grey',
@@ -53,6 +54,14 @@ export const tab_groups = defineTool({
       .optional()
       .describe('Collapse/expand the group for "update".'),
   }),
+  output: z.object({
+    action: z.enum(['list', 'create', 'update', 'ungroup', 'close']),
+    groups: z.array(tabGroupWithPagesSchema).optional(),
+    count: z.number().int().optional(),
+    group: tabGroupWithPagesSchema.optional(),
+    pageIds: z.array(z.number().int()).optional(),
+    groupId: z.string().optional(),
+  }),
   annotations: { openWorldHint: true },
   handler: async (args, ctx) => {
     const { pages } = ctx.session
@@ -93,7 +102,11 @@ export const tab_groups = defineTool({
         const text = resolved.length
           ? resolved.map(formatGroup).join('\n')
           : '(no tab groups)'
-        return textResult(text, { groups: resolved, count: resolved.length })
+        return textResult(text, {
+          action: 'list',
+          groups: resolved,
+          count: resolved.length,
+        })
       }
 
       case 'create': {
@@ -121,6 +134,7 @@ export const tab_groups = defineTool({
         }
         const resolved = await withPages(group)
         return textResult(`grouped into ${formatGroup(resolved)}`, {
+          action: 'create',
           group: resolved,
         })
       }
@@ -146,6 +160,7 @@ export const tab_groups = defineTool({
         })) as { group: TabGroup }
         const resolved = await withPages(group)
         return textResult(`updated ${formatGroup(resolved)}`, {
+          action: 'update',
           group: resolved,
         })
       }
@@ -157,6 +172,7 @@ export const tab_groups = defineTool({
         const tabIds = await toTabIds(args.pages)
         await ctx.session.cdp('Browser.removeTabsFromGroup', { tabIds })
         return textResult(`ungrouped ${args.pages.length} page(s)`, {
+          action: 'ungroup',
           pageIds: args.pages,
           count: args.pages.length,
         })
@@ -170,6 +186,7 @@ export const tab_groups = defineTool({
           groupId: args.groupId,
         })
         return textResult(`closed tab group ${args.groupId} and all its tabs`, {
+          action: 'close',
           groupId: args.groupId,
         })
       }

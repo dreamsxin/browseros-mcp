@@ -22,6 +22,11 @@ export const pdf = defineTool({
       .default(false)
       .describe('Use CSS page size when the page defines one.'),
   }),
+  output: z.object({
+    page: z.number().int(),
+    path: z.string(),
+    bytes: z.number().int(),
+  }),
   annotations: { readOnlyHint: true },
   handler: async (args, ctx) => {
     const { session } = await ctx.session.pages.getSession(args.page)

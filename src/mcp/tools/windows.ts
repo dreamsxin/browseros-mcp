@@ -1,6 +1,7 @@
 import type { WindowInfo } from '../../browser/windows'
 import { z } from 'zod'
 import { defineTool, errorResult, textResult } from './framework'
+import { windowInfoSchema } from './output-schemas'
 
 const ACTIONS = [
   'list',
@@ -34,6 +35,16 @@ export const windows = defineTool({
       .boolean()
       .optional()
       .describe('Focus the window after making it visible.'),
+  }),
+  output: z.object({
+    action: z.enum(ACTIONS),
+    windows: z.array(windowInfoSchema).optional(),
+    count: z.number().int().optional(),
+    window: windowInfoSchema.optional(),
+    windowId: z.number().int().optional(),
+    previousWindowId: z.number().int().optional(),
+    newWindowId: z.number().int().optional(),
+    replaced: z.boolean().optional(),
   }),
   annotations: { openWorldHint: true },
   handler: async (args, ctx) => {

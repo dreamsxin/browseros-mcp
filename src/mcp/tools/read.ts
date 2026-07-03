@@ -38,6 +38,13 @@ export const read = defineTool({
       .optional()
       .describe('For markdown reads, include image references.'),
   }),
+  output: z.object({
+    page: z.number().int(),
+    format: z.enum(['markdown', 'text', 'links']),
+    path: z.string().optional(),
+    contentLength: z.number().int(),
+    writtenToFile: z.boolean(),
+  }),
   annotations: { readOnlyHint: true },
   handler: async (args, ctx) => {
     const { session } = await ctx.session.pages.getSession(args.page)

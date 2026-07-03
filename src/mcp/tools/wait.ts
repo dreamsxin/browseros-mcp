@@ -36,6 +36,14 @@ export const wait = defineTool({
       .optional()
       .describe('Max wait in ms before giving up (default 2000).'),
   }),
+  output: z.object({
+    page: z.number().int(),
+    for: z.enum(['text', 'selector', 'time']),
+    value: z.string().optional(),
+    matched: z.boolean(),
+    waitedMs: z.number().int().optional(),
+    timeoutMs: z.number().int(),
+  }),
   annotations: { readOnlyHint: true },
   handler: async (args, ctx) => {
     const timeout = clampTimeout(
@@ -49,8 +57,12 @@ export const wait = defineTool({
       const waitMs = Math.min(parseWaitMs(value, DEFAULT_PAUSE_MS), timeout)
       await abortableDelay(waitMs, ctx.signal)
       return textResult(`waited ${waitMs}ms`, {
+        page: args.page,
+        for: args.for,
+        ...(value !== undefined && { value }),
         matched: true,
         waitedMs: waitMs,
+        timeoutMs: timeout,
       })
     }
     if (!value) {
@@ -73,7 +85,13 @@ export const wait = defineTool({
         returnByValue: true,
       })
       if (result.result?.value === true) {
-        return textResult(`matched (${args.for})`, { matched: true })
+        return textResult(`matched (${args.for})`, {
+          page: args.page,
+          for: args.for,
+          value,
+          matched: true,
+          timeoutMs: timeout,
+        })
       }
       await abortableDelay(
         Math.min(300, Math.max(0, deadline - Date.now())),
@@ -81,7 +99,11 @@ export const wait = defineTool({
       )
     }
     return textResult(`timed out after ${timeout}ms waiting for ${args.for}`, {
+      page: args.page,
+      for: args.for,
+      value,
       matched: false,
+      timeoutMs: timeout,
     })
   },
 })

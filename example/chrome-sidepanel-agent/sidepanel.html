@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BrowserOS Agent Panel</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div>
+          <h1>BrowserOS Agent</h1>
+          <p class="subtitle">Chrome side panel wired to a local Python agent service.</p>
+        </div>
+        <button id="new-chat-btn" class="secondary">New chat</button>
+      </header>
+
+      <section class="status-row">
+        <div class="status-pill">
+          <span id="status-dot" class="dot"></span>
+          <span id="status-text">Disconnected</span>
+        </div>
+        <button id="check-health-btn" class="secondary">Check service</button>
+      </section>
+
+      <section class="settings-card">
+        <label for="service-url">Service URL</label>
+        <div class="settings-inline">
+          <input id="service-url" type="text" placeholder="http://127.0.0.1:8001" />
+          <button id="save-settings-btn" class="secondary">Save</button>
+        </div>
+      </section>
+
+      <main id="messages" class="messages">
+        <div id="empty-state" class="empty-state">
+          <h2>Ask the browser agent to do something</h2>
+          <p>It will call the Python service, which then drives BrowserOS MCP tools.</p>
+        </div>
+      </main>
+
+      <form id="composer" class="composer">
+        <textarea
+          id="prompt-input"
+          rows="4"
+          placeholder="Summarize the current page, open a URL, or inspect a site."
+        ></textarea>
+        <div class="composer-actions">
+          <span class="hint">Shift+Enter for newline</span>
+          <button id="send-btn" type="submit">Send</button>
+        </div>
+      </form>
+    </div>
+
+    <script src="sidepanel.js"></script>
+  </body>
+  </html>

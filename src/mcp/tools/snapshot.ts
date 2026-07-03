@@ -9,6 +9,16 @@ export const snapshot = defineTool({
   input: z.object({
     page: z.number().int().describe('Page id from `tabs` or `navigate`.'),
   }),
+  output: z.object({
+    page: z.number().int(),
+    snapshot: z.string(),
+    path: z.string().optional(),
+    contentLength: z.number().int().optional(),
+    tokenEstimate: z.number().int().optional(),
+    writtenToFile: z.boolean().optional(),
+    outputWriteFailed: z.boolean().optional(),
+    error: z.string().optional(),
+  }),
   annotations: { readOnlyHint: true },
   handler: async (args, ctx) => {
     const { text } = await ctx.session.observe(args.page).snapshot()

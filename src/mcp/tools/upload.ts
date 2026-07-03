@@ -16,6 +16,12 @@ export const upload = defineTool({
       .optional()
       .describe('Local file paths to upload.'),
   }),
+  output: z.object({
+    page: z.number().int(),
+    ref: z.string(),
+    files: z.array(z.string()),
+    uploaded: z.number().int(),
+  }),
   handler: async (args, ctx) => {
     const files = args.files ?? (args.file === undefined ? [] : [args.file])
     if (files.length === 0) {

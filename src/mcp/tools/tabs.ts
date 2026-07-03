@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { defineTool, errorResult, textResult } from './framework'
+import { pageInfoSchema, pageListEntrySchema } from './output-schemas'
 
 export const tabs = defineTool({
   name: 'tabs',
@@ -21,6 +22,11 @@ export const tabs = defineTool({
       .describe('Create in a hidden window for action="new".'),
     page: z.number().int().optional().describe('Page id for action="close".'),
   }),
+  output: z.object({
+    action: z.enum(['list', 'active', 'new', 'close']),
+    pages: z.array(pageListEntrySchema).optional(),
+    page: z.union([pageInfoSchema, z.number().int()]).optional(),
+  }),
   annotations: { openWorldHint: true },
   handler: async (args, ctx) => {
     switch (args.action) {
@@ -28,6 +34,7 @@ export const tabs = defineTool({
         const pages = await ctx.session.pages.list()
         const lines = pages.map(formatPageLine)
         return textResult(lines.join('\n') || '(no open pages)', {
+          action: 'list',
           pages: pages.map((p) => ({
             page: p.pageId,
             url: p.url,
@@ -42,7 +49,21 @@ export const tabs = defineTool({
         }
         return textResult(`Active page: ${formatPageLine(page)}`, {
           action: 'active',
-          page,
+          page: {
+            page: page.pageId,
+            targetId: page.targetId,
+            tabId: page.tabId,
+            url: page.url,
+            title: page.title,
+            isActive: page.isActive,
+            isLoading: page.isLoading,
+            loadProgress: page.loadProgress,
+            isPinned: page.isPinned,
+            isHidden: page.isHidden,
+            ...(page.windowId !== undefined && { windowId: page.windowId }),
+            ...(page.index !== undefined && { index: page.index }),
+            ...(page.groupId !== undefined && { groupId: page.groupId }),
+          },
         })
       }
       case 'new': {
@@ -55,14 +76,17 @@ export const tabs = defineTool({
             tabGroupId: ctx.defaultTabGroupId,
           },
         )
-        return textResult(`opened page ${page}`, { page })
+        return textResult(`opened page ${page}`, { action: 'new', page })
       }
       case 'close': {
         if (args.page === undefined) {
           return errorResult('tabs close: page is required.')
         }
         await ctx.session.pages.close(args.page)
-        return textResult(`closed page ${args.page}`, { page: args.page })
+        return textResult(`closed page ${args.page}`, {
+          action: 'close',
+          page: args.page,
+        })
       }
       default:
         return errorResult('tabs: unsupported action.')

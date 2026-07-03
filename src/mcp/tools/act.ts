@@ -61,13 +61,37 @@ export const act = defineTool({
     clickCount: z.number().int().optional(),
     clear: z.boolean().optional(),
   }),
+  output: z.object({
+    page: z.number().int(),
+    kind: z.enum([
+      'click',
+      'click_at',
+      'type',
+      'type_at',
+      'fill',
+      'press',
+      'hover',
+      'hover_at',
+      'focus',
+      'check',
+      'uncheck',
+      'select',
+      'scroll',
+      'drag',
+      'drag_at',
+    ]),
+    changed: z.boolean().optional(),
+    urlChanged: z.boolean().optional(),
+    beforeUrl: z.string().optional(),
+    afterUrl: z.string().optional(),
+  }),
   handler: async (args, ctx, response) => {
     const input = ctx.session.input(args.page)
 
     const err = await runKind(args, input)
     if (err) return err
 
-    response.data({ kind: args.kind })
+    response.data({ page: args.page, kind: args.kind })
     response.includeDiff(args.page, { includeStructured: true })
     return textResult(`ok (${args.kind})`)
   },
