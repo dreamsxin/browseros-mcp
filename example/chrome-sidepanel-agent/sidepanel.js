@@ -22,6 +22,9 @@
     sessionId: null,
     messages: [],
     busy: false,
+    editingLastUser: false,
+    editingIndex: null,
+    composerDraftBeforeEdit: '',
   };
 
   const $ = (selector) => document.querySelector(selector);
@@ -30,6 +33,7 @@
     emptyState: $('#empty-state'),
     promptInput: $('#prompt-input'),
     sendBtn: $('#send-btn'),
+    cancelEditBtn: $('#cancel-edit-btn'),
     newChatBtn: $('#new-chat-btn'),
     serviceUrl: $('#service-url'),
     saveSettingsBtn: $('#save-settings-btn'),
@@ -68,7 +72,16 @@
     state.busy = busy;
     el.sendBtn.disabled = busy;
     el.promptInput.disabled = busy;
-    el.sendBtn.textContent = busy ? 'Working...' : 'Send';
+    updateComposerMode();
+  }
+
+  function updateComposerMode() {
+    el.sendBtn.textContent = state.busy
+      ? 'Working...'
+      : state.editingLastUser
+        ? 'Resubmit'
+        : 'Send';
+    el.cancelEditBtn.classList.toggle('hidden', !state.editingLastUser || state.busy);
   }
 
   function updateStatus(kind, text) {
@@ -88,13 +101,22 @@
     keep.classList.toggle('hidden', messages.length > 0);
     if (messages.length === 0) return;
 
-    for (const message of messages) {
-      el.messages.appendChild(buildMessageNode(message));
+    const lastUserIndex = findLastUserMessageIndex();
+    for (const [index, message] of messages.entries()) {
+      el.messages.appendChild(buildMessageNode(message, index, lastUserIndex));
     }
-    el.messages.scrollTop = el.messages.scrollHeight;
+    scrollMessagesToBottom();
   }
 
-  function buildMessageNode(message) {
+  function scrollMessagesToBottom() {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        el.messages.scrollTop = el.messages.scrollHeight;
+      });
+    });
+  }
+
+  function buildMessageNode(message, index, lastUserIndex) {
     const wrap = document.createElement('section');
     wrap.className = `message ${message.role}`;
 
@@ -108,10 +130,23 @@
 
     const meta = document.createElement('span');
     meta.className = 'meta';
-    meta.textContent = message.time || '';
+    meta.textContent = `${message.time || ''}${message.edited ? ' · edited' : ''}`;
 
     header.appendChild(role);
-    header.appendChild(meta);
+    const headerRight = document.createElement('div');
+    headerRight.className = 'message-actions';
+    headerRight.appendChild(meta);
+
+    if (message.role === 'user' && index === lastUserIndex && !state.busy) {
+      const editButton = document.createElement('button');
+      editButton.type = 'button';
+      editButton.className = 'text-button';
+      editButton.textContent = 'Edit';
+      editButton.addEventListener('click', () => startEditLastUser());
+      headerRight.appendChild(editButton);
+    }
+
+    header.appendChild(headerRight);
 
     const content = document.createElement('div');
     content.className = 'content';
@@ -123,6 +158,9 @@
     if (Array.isArray(message.events) && message.events.length > 0) {
       const details = document.createElement('details');
       details.className = 'trace';
+      details.addEventListener('toggle', () => {
+        if (details.open) scrollMessagesToBottom();
+      });
 
       const summary = document.createElement('summary');
       summary.className = 'trace-summary';
@@ -194,6 +232,41 @@
     });
   }
 
+  function findLastUserMessageIndex() {
+    for (let index = state.messages.length - 1; index >= 0; index -= 1) {
+      if (state.messages[index].role === 'user') return index;
+    }
+    return -1;
+  }
+
+  function clearEditMode() {
+    state.editingLastUser = false;
+    state.editingIndex = null;
+    state.composerDraftBeforeEdit = '';
+    updateComposerMode();
+  }
+
+  function startEditLastUser() {
+    const index = findLastUserMessageIndex();
+    if (index < 0 || state.busy) return;
+    state.editingLastUser = true;
+    state.editingIndex = index;
+    state.composerDraftBeforeEdit = el.promptInput.value;
+    el.promptInput.value = state.messages[index].content || '';
+    el.promptInput.focus();
+    updateComposerMode();
+    updateStatus('warn', 'Editing last question');
+  }
+
+  function cancelEditLastUser() {
+    if (!state.editingLastUser || state.busy) return;
+    const draft = state.composerDraftBeforeEdit || '';
+    clearEditMode();
+    el.promptInput.value = draft;
+    el.promptInput.focus();
+    updateStatus('warn', 'Edit canceled');
+  }
+
   async function callService(path, payload, method = 'POST') {
     const url = state.settings.serviceUrl.replace(/\/$/, '') + path;
     const response = await fetch(url, {
@@ -223,9 +296,17 @@
     const message = el.promptInput.value.trim();
     if (!message || state.busy) return;
 
-    pushMessage('user', message);
+    const canReplaceLastUser =
+      state.editingLastUser &&
+      state.editingIndex === findLastUserMessageIndex();
+    if (canReplaceLastUser) {
+      state.messages = state.messages.slice(0, state.editingIndex);
+    }
+    pushMessage('user', message, canReplaceLastUser ? { edited: true } : {});
+    clearEditMode();
     el.promptInput.value = '';
     render();
+    scrollMessagesToBottom();
     await persistState();
 
     setBusy(true);
@@ -234,6 +315,7 @@
       const response = await callService('/api/chat', {
         session_id: state.sessionId,
         message,
+        replace_last_user: Boolean(canReplaceLastUser && state.sessionId),
       });
       state.sessionId = response.session_id || state.sessionId;
       if (response.ok) {
@@ -253,6 +335,7 @@
     } finally {
       setBusy(false);
       render();
+      scrollMessagesToBottom();
       await persistState();
     }
   }
@@ -261,7 +344,9 @@
     const previousSessionId = state.sessionId;
     state.sessionId = null;
     state.messages = [];
+    clearEditMode();
     render();
+    scrollMessagesToBottom();
     await persistState();
     updateStatus('warn', 'Chat reset');
     if (previousSessionId) {
@@ -296,6 +381,7 @@
     el.checkHealthBtn.addEventListener('click', checkHealth);
     el.saveSettingsBtn.addEventListener('click', saveSettings);
     el.newChatBtn.addEventListener('click', resetChat);
+    el.cancelEditBtn.addEventListener('click', cancelEditLastUser);
   }
 
   async function init() {

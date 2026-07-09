@@ -7,7 +7,7 @@ Start the Browser Control MCP server first, then run:
 
 The service exposes:
   GET  /health
-  POST /api/chat   {"message": "...", "session_id": "...?"}
+  POST /api/chat   {"message": "...", "session_id": "...?", "replace_last_user": false?}
   POST /api/reset  {"session_id": "..."}
 """
 
@@ -143,11 +143,33 @@ class BrowserAgentSession:
     def close(self) -> None:
         self.mcp.close()
 
-    def run_turn(self, user_prompt: str, max_turns: int | None = None) -> dict[str, Any]:
+    def rewind_last_user_turn(self) -> bool:
+        for index in range(len(self.messages) - 1, 0, -1):
+            if isinstance(self.messages[index], self.human_message_cls):
+                del self.messages[index:]
+                return True
+        return False
+
+    def run_turn(
+        self,
+        user_prompt: str,
+        max_turns: int | None = None,
+        replace_last_user: bool = False,
+    ) -> dict[str, Any]:
         with self.lock:
             self.last_used_at = time.time()
             recorder = EventRecorder()
             effective_max_turns = max_turns or self.settings.max_turns
+            replaced_last_user = self.rewind_last_user_turn() if replace_last_user else False
+            if replace_last_user:
+                recorder.add(
+                    "diagnostic",
+                    message=(
+                        "Replaced the previous user turn."
+                        if replaced_last_user
+                        else "replace_last_user requested, but no previous user turn was found."
+                    ),
+                )
             self.messages.append(self.human_message_cls(content=user_prompt))
             seen_tool_calls: set[str] = set()
             successful_read_seen = False
@@ -212,6 +234,7 @@ class BrowserAgentSession:
                         "answer": content,
                         "events": recorder.events,
                         "turns": turn,
+                        "replaced_last_user": replaced_last_user,
                     }
 
                 recorder.add("agent_turn", turn=turn, tool_calls=len(tool_calls))
@@ -321,6 +344,7 @@ class BrowserAgentSession:
                 "error": f"Stopped after {effective_max_turns} turns without a final answer.",
                 "events": recorder.events,
                 "turns": effective_max_turns,
+                "replaced_last_user": replaced_last_user,
             }
 
 
@@ -377,9 +401,14 @@ class BrowserAgentService:
         message: str,
         session_id: str | None = None,
         max_turns: int | None = None,
+        replace_last_user: bool = False,
     ) -> dict[str, Any]:
         session_id, session = self.sessions.get_or_create(session_id)
-        result = session.run_turn(message, max_turns=max_turns)
+        result = session.run_turn(
+            message,
+            max_turns=max_turns,
+            replace_last_user=replace_last_user,
+        )
         return {
             "session_id": session_id,
             **result,
@@ -435,6 +464,7 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
                     message=message,
                     session_id=string_or_none(payload.get("session_id")),
                     max_turns=int(payload["max_turns"]) if "max_turns" in payload else None,
+                    replace_last_user=payload.get("replace_last_user") is True,
                 )
                 self.send_json(200, response)
                 return
