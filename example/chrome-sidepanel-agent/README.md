@@ -1,4 +1,4 @@
-# BrowserOS Agent Side Panel
+# Browser Control Agent Side Panel
 
 Load this folder as an unpacked Chrome extension after the local Python service is running.
 

@@ -3,7 +3,7 @@ chrome.runtime.onInstalled.addListener(async () => {
     await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
     await chrome.sidePanel.setOptions({ path: 'sidepanel.html' });
   } catch (error) {
-    console.warn('[browseros-agent-panel] failed to configure side panel', error);
+    console.warn('[browser-control-agent-panel] failed to configure side panel', error);
   }
 });
 

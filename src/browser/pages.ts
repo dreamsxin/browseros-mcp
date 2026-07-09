@@ -120,7 +120,7 @@ export class PageManager {
       }
     }
 
-    return [...this.pages.values()].sort((a, b) => a.pageId - b.pageId)
+    return this.sortForVisualOrder([...this.pages.values()])
   }
 
   // ── Standard Chrome mode: uses Target.getTargets ──
@@ -153,7 +153,7 @@ export class PageManager {
       }
     }
 
-    return [...this.pages.values()].sort((a, b) => a.pageId - b.pageId)
+    return this.sortForVisualOrder([...this.pages.values()])
   }
 
   getInfo(pageId: number): PageInfo | undefined {
@@ -720,4 +720,26 @@ export class PageManager {
       ...(tab.groupId !== undefined && tab.groupId >= 0 && { groupId: String(tab.groupId) }),
     }
   }
+
+  private sortForVisualOrder(pages: PageInfo[]): PageInfo[] {
+    return pages.sort((a, b) => {
+      const hidden = Number(a.isHidden) - Number(b.isHidden)
+      if (hidden !== 0) return hidden
+
+      const window = compareOptionalNumber(a.windowId, b.windowId)
+      if (window !== 0) return window
+
+      const index = compareOptionalNumber(a.index, b.index)
+      if (index !== 0) return index
+
+      return a.pageId - b.pageId
+    })
+  }
+}
+
+function compareOptionalNumber(a: number | undefined, b: number | undefined): number {
+  if (a === undefined && b === undefined) return 0
+  if (a === undefined) return 1
+  if (b === undefined) return -1
+  return a - b
 }

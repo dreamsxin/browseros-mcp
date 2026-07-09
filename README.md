@@ -315,6 +315,43 @@ Accept: application/json, text/event-stream
 
 ## Architecture
 
+```mermaid
+flowchart TD
+  A["🤖 LLM / MCP Client"]:::client --> B["🧩 Browser Control MCP Server<br/>/mcp 或 /mcp/stateless"]:::server
+  B --> C["📦 Tool Registry<br/>tabs / windows / bookmarks / history / snapshot ..."]:::tool
+  C --> D["🌐 BrowserSession"]:::session
+  D --> E{"⚙️ 后端模式"}:::decision
+
+  E -->|Enhanced CDP| F["🔧 Enhanced Browser CDP"]:::backend
+  E -->|Standard CDP| G["🟡 Standard Chrome CDP"]:::backend
+  E -->|Extension| H["🔌 Chrome Extension Bridge"]:::backend
+
+  F --> I["📄 浏览器数据 / 操作结果"]:::result
+  G --> I
+  H --> I
+
+  I --> J["✅ Structured MCP Result"]:::result
+  J --> A
+
+  classDef client fill:#3b82f6,stroke:#1e40af,color:#fff
+  classDef server fill:#10b981,stroke:#047857,color:#fff
+  classDef tool fill:#f59e0b,stroke:#b45309,color:#fff
+  classDef session fill:#8b5cf6,stroke:#5b21b6,color:#fff
+  classDef decision fill:#ec4899,stroke:#be185d,color:#fff
+  classDef backend fill:#fbbf24,stroke:#d97706,color:#000
+  classDef result fill:#06b6d4,stroke:#0e7490,color:#fff
+```
+
+**简化后的主脉络**
+
+1. **LLM / MCP Client**（蓝色）向 MCP 服务器发起请求。
+2. **MCP Server**（绿色）接收请求，调用内部的**工具注册表**（橙色）查找可用工具。
+3. 工具调度进入**浏览器会话**（紫色），根据环境选择三种后端之一（粉色决策节点）。
+4. **三种后端**（黄色）各司其职：增强 CDP、标准 CDP 或 Chrome 扩展桥接，最终产生统一的**浏览器数据/操作结果**（青色）。
+5. **结构化 MCP 结果**（青色）返回给客户端，完成闭环。
+
+原图中扩展特有的 WebSocket 状态同步、Tab/Window 模型拼接等内部实现细节已被省略，让主干更突出。
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    HTTP+SSE Server                        │

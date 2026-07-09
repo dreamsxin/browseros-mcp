@@ -21,8 +21,15 @@ export const pageInfoSchema = z.object({
 
 export const pageListEntrySchema = z.object({
   page: z.number().int(),
+  tabId: z.number().int().optional(),
   url: z.string(),
   title: z.string().optional(),
+  isActive: z.boolean().optional(),
+  isPinned: z.boolean().optional(),
+  isHidden: z.boolean().optional(),
+  windowId: z.number().int().optional(),
+  index: z.number().int().optional(),
+  groupId: z.string().optional(),
 })
 
 export const windowBoundsSchema = z.object({

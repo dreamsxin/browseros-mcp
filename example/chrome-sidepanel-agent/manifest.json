@@ -1,15 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "BrowserOS Agent Panel",
+  "name": "Browser Control Agent Panel",
   "version": "0.1.0",
-  "description": "A Chrome side panel that talks to a local Python BrowserOS agent service.",
+  "description": "A Chrome side panel that talks to a local Python browser agent service.",
   "permissions": ["sidePanel", "storage"],
   "host_permissions": ["http://127.0.0.1/*", "http://localhost/*"],
   "side_panel": {
     "default_path": "sidepanel.html"
   },
   "action": {
-    "default_title": "BrowserOS Agent Panel"
+    "default_title": "Browser Control Agent Panel"
   },
   "background": {
     "service_worker": "background.js"

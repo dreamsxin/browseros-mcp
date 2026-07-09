@@ -63,8 +63,15 @@ export const tabs = defineTool({
           action: 'list',
           pages: pages.map((p) => ({
             page: p.pageId,
+            tabId: p.tabId,
             url: p.url,
             title: p.title,
+            isActive: p.isActive,
+            isPinned: p.isPinned,
+            isHidden: p.isHidden,
+            ...(p.windowId !== undefined && { windowId: p.windowId }),
+            ...(p.index !== undefined && { index: p.index }),
+            ...(p.groupId !== undefined && { groupId: p.groupId }),
           })),
         })
       }

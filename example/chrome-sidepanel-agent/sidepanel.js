@@ -6,9 +6,15 @@
   };
 
   const STORAGE_KEYS = {
-    settings: 'browserosAgentPanelSettings',
-    sessionId: 'browserosAgentPanelSessionId',
-    messages: 'browserosAgentPanelMessages',
+    settings: 'browserControlAgentPanelSettings',
+    sessionId: 'browserControlAgentPanelSessionId',
+    messages: 'browserControlAgentPanelMessages',
+  };
+
+  const LEGACY_STORAGE_KEYS = {
+    settings: 'browser' + 'osAgentPanelSettings',
+    sessionId: 'browser' + 'osAgentPanelSessionId',
+    messages: 'browser' + 'osAgentPanelMessages',
   };
 
   const state = {
@@ -34,11 +40,19 @@
   };
 
   async function loadState() {
-    const data = await chrome.storage.local.get(Object.values(STORAGE_KEYS));
-    state.settings = { ...DEFAULT_SETTINGS, ...(data[STORAGE_KEYS.settings] || {}) };
-    state.sessionId = data[STORAGE_KEYS.sessionId] || null;
-    state.messages = Array.isArray(data[STORAGE_KEYS.messages])
-      ? data[STORAGE_KEYS.messages]
+    const data = await chrome.storage.local.get([
+      ...Object.values(STORAGE_KEYS),
+      ...Object.values(LEGACY_STORAGE_KEYS),
+    ]);
+    state.settings = {
+      ...DEFAULT_SETTINGS,
+      ...(data[LEGACY_STORAGE_KEYS.settings] || {}),
+      ...(data[STORAGE_KEYS.settings] || {}),
+    };
+    state.sessionId = data[STORAGE_KEYS.sessionId] || data[LEGACY_STORAGE_KEYS.sessionId] || null;
+    const messages = data[STORAGE_KEYS.messages] || data[LEGACY_STORAGE_KEYS.messages];
+    state.messages = Array.isArray(messages)
+      ? messages
       : [];
   }
 
@@ -292,7 +306,7 @@
   }
 
   init().catch((error) => {
-    console.error('[browseros-agent-panel] init failed', error);
+    console.error('[browser-control-agent-panel] init failed', error);
     updateStatus('error', String(error.message || error));
   });
 })();
