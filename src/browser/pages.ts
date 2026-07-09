@@ -2,7 +2,6 @@ import type { ProtocolApi } from '../cdp/generated/protocol-api'
 import { logger } from './logger'
 import {
   type CdpConnection,
-  EXCLUDED_URL_PREFIXES,
   type SessionId,
 } from '../cdp/connection'
 import { bridgeInstallMessage, type BridgeTab, type ChromeExtensionBridge } from './chrome-extension-bridge'
@@ -93,9 +92,7 @@ export class PageManager {
 
   private async listBrowserOS(): Promise<PageInfo[]> {
     const result = await this.cdp.Browser.getTabs({ includeHidden: true })
-    const tabs = (result.tabs as TabInfo[]).filter(
-      (tab) => !EXCLUDED_URL_PREFIXES.some((prefix) => tab.url.startsWith(prefix)),
-    )
+    const tabs = result.tabs as TabInfo[]
 
     const seen = new Set<string>()
     for (const tab of tabs) {
@@ -127,9 +124,11 @@ export class PageManager {
 
   private async listChrome(): Promise<PageInfo[]> {
     const result = await this.cdp.Target.getTargets()
-    const targets = result.targetInfos
-      .filter((t) => t.type === 'page')
-      .filter((t) => !EXCLUDED_URL_PREFIXES.some((prefix) => t.url.startsWith(prefix)))
+    const targets = result.targetInfos.filter((t) => t.type === 'page')
+
+    if (this.bridge?.hasUsableState()) {
+      return this.listChromeFromBridge(targets)
+    }
 
     const seen = new Set<string>()
     for (const target of targets) {
@@ -141,6 +140,66 @@ export class PageManager {
       } else {
         const pageId = this.nextPageId++
         const tab = this.chromeTabInfo(target, pageId, bridgeTab)
+        this.pages.set(pageId, { pageId, ...tab })
+      }
+    }
+
+    for (const [pageId, info] of this.pages) {
+      if (!seen.has(info.targetId)) {
+        this.pages.delete(pageId)
+        this.sessions.delete(info.targetId)
+        this.hooks.onPageDetached?.(pageId)
+      }
+    }
+
+    return this.sortForVisualOrder([...this.pages.values()])
+  }
+
+  private listChromeFromBridge(
+    targets: Array<{ targetId: string; url: string; title: string; browserContextId?: string }>,
+  ): PageInfo[] {
+    const targetsById = new Map(targets.map((target) => [target.targetId, target]))
+    const seen = new Set<string>()
+
+    for (const bridgeTab of this.bridge!.listTabs()) {
+      const target = bridgeTab.targetId ? targetsById.get(bridgeTab.targetId) : undefined
+      const existing =
+        (bridgeTab.targetId ? this.findByTarget(bridgeTab.targetId) : undefined) ??
+        this.findByTab(bridgeTab.tabId)
+      const targetId =
+        bridgeTab.targetId ??
+        existing?.targetId ??
+        `chrome-tab:${bridgeTab.tabId}`
+      seen.add(targetId)
+
+      if (existing) {
+        if (existing.targetId !== targetId) {
+          this.sessions.delete(existing.targetId)
+        }
+        Object.assign(
+          existing,
+          this.chromeTabInfo(
+            target ?? {
+              targetId,
+              url: bridgeTab.url ?? existing.url,
+              title: bridgeTab.title ?? existing.title,
+            },
+            existing.pageId,
+            bridgeTab,
+            existing,
+          ),
+        )
+      } else {
+        const pageId = this.nextPageId++
+        const tab = this.chromeTabInfo(
+          target ?? {
+            targetId,
+            url: bridgeTab.url ?? '',
+            title: bridgeTab.title ?? '',
+          },
+          pageId,
+          bridgeTab,
+        )
         this.pages.set(pageId, { pageId, ...tab })
       }
     }

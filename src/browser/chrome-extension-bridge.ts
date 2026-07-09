@@ -137,6 +137,7 @@ export class ChromeExtensionBridge {
       }
     }
 
+    this.normalizeActiveTabs()
     return this.health()
   }
 
@@ -225,6 +226,7 @@ export class ChromeExtensionBridge {
     clearTimeout(pending.timer)
     this.pendingCommands.delete(commandId)
     if (result.ok) {
+      this.mergeStateFromCommandResult(result.result)
       pending.resolve(result.result)
     } else {
       pending.reject(new Error(result.error ?? 'Extension command failed'))
@@ -444,6 +446,73 @@ export class ChromeExtensionBridge {
     if (browserId) this.browserId = browserId
   }
 
+  private mergeStateFromCommandResult(result: unknown): void {
+    if (!isRecord(result)) return
+
+    if (Array.isArray(result.tabs)) {
+      const seenTabIds = new Set<number>()
+      for (const item of result.tabs) {
+        if (!isBridgeTabLike(item)) continue
+        const existing = this.tabsById.get(item.tabId)
+        const tab = {
+          ...existing,
+          ...item,
+          targetId: item.targetId ?? existing?.targetId,
+        }
+        this.tabsById.set(tab.tabId, tab)
+        seenTabIds.add(tab.tabId)
+        if (tab.targetId) this.targetToTab.set(tab.targetId, tab.tabId)
+      }
+      for (const tabId of [...this.tabsById.keys()]) {
+        if (!seenTabIds.has(tabId)) {
+          const removed = this.tabsById.get(tabId)
+          this.tabsById.delete(tabId)
+          if (removed?.targetId) this.targetToTab.delete(removed.targetId)
+        }
+      }
+    }
+
+    if (Array.isArray(result.windows)) {
+      this.windowsById.clear()
+      for (const item of result.windows) {
+        if (isBridgeWindowLike(item)) this.windowsById.set(item.windowId, item)
+      }
+    }
+
+    if (Array.isArray(result.groups)) {
+      this.groupsById.clear()
+      for (const item of result.groups) {
+        if (isBridgeTabGroupLike(item)) this.groupsById.set(item.groupId, item)
+      }
+    }
+
+    this.normalizeActiveTabs()
+  }
+
+  private normalizeActiveTabs(): void {
+    const tabsByWindow = new Map<number, BridgeTab[]>()
+    for (const tab of this.tabsById.values()) {
+      const tabs = tabsByWindow.get(tab.windowId) ?? []
+      tabs.push(tab)
+      tabsByWindow.set(tab.windowId, tabs)
+    }
+
+    for (const [windowId, tabs] of tabsByWindow) {
+      tabs.sort((a, b) => a.index - b.index)
+      const window = this.windowsById.get(windowId)
+      const activeTabId =
+        window?.activeTabId ??
+        tabs.find((tab) => tab.active)?.tabId ??
+        tabs[0]?.tabId
+      for (const tab of tabs) {
+        this.tabsById.set(tab.tabId, {
+          ...tab,
+          active: tab.tabId === activeTabId,
+        })
+      }
+    }
+  }
+
   private async enqueueCommand<T = unknown>(
     type: string,
     payload?: Record<string, unknown>,
@@ -560,6 +629,23 @@ export class ChromeExtensionBridge {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
+}
+
+function isBridgeTabLike(value: unknown): value is BridgeTab {
+  return isRecord(value) &&
+    typeof value.tabId === 'number' &&
+    typeof value.windowId === 'number' &&
+    typeof value.index === 'number'
+}
+
+function isBridgeWindowLike(value: unknown): value is BridgeWindow {
+  return isRecord(value) && typeof value.windowId === 'number'
+}
+
+function isBridgeTabGroupLike(value: unknown): value is BridgeTabGroup {
+  return isRecord(value) &&
+    typeof value.groupId === 'number' &&
+    typeof value.windowId === 'number'
 }
 
 function readArrayResult<T>(value: unknown, key: string): T[] {

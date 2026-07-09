@@ -458,6 +458,7 @@ function setupExtensionWebSocket(
         if (type === 'hello') {
           const browserId = typeof message.browserId === 'string' ? message.browserId : undefined
           send({ type: 'hello', health: bridge.hello(browserId) })
+          send({ type: 'sync' })
           return
         }
         if (type === 'ping') {
@@ -509,6 +510,7 @@ function setupExtensionWebSocket(
     })
 
     send({ type: 'hello', health: bridge.heartbeat() })
+    send({ type: 'sync' })
   })
 
   return wss

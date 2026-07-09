@@ -1,7 +1,6 @@
 export { CdpConnectionImpl } from './connection-impl.js'
 export type { CdpConnectionImplConfig } from './connection-impl.js'
 export type { CdpConnection, SessionId, FrameId } from './connection.js'
-export { EXCLUDED_URL_PREFIXES } from './connection.js'
 export { WebSocketTransport } from './transport.js'
 export {
   createDomainProxy,

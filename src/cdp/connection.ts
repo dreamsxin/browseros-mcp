@@ -24,10 +24,3 @@ export interface CdpConnection extends ProtocolApi {
   connectionEpoch(): number
 }
 
-/** Internal/agent surfaces we never expose as pages. */
-export const EXCLUDED_URL_PREFIXES: readonly string[] = [
-  'chrome-extension://',
-  'chrome-untrusted://',
-  'chrome-search://',
-  'devtools://',
-]
