@@ -34,7 +34,8 @@
     "start": "tsx src/cli.ts",
     "dev": "tsx watch src/cli.ts",
     "build": "tsc && node scripts/fix-esm-imports.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:tabs-stability": "node scripts/tabs-stability.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

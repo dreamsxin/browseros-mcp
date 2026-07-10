@@ -416,7 +416,6 @@ export class PageManager {
         background: opts?.background,
         ...(opts?.windowId !== undefined && { windowId: opts.windowId }),
       })
-      const pageId = this.nextPageId++
       const targetId = tab.targetId
       if (!targetId) {
         await this.list()
@@ -424,9 +423,7 @@ export class PageManager {
         if (found) return found.pageId
         throw new Error('Extension created a tab, but no CDP targetId has been reported yet.')
       }
-      const page = this.pageInfoFromBridgeTab(pageId, tab, targetId, url)
-      this.pages.set(pageId, page)
-      return pageId
+      return this.upsertFromTab(this.tabInfoFromBridgeTab(tab, targetId, url)).pageId
     }
 
     // Standard Chrome: Target.createTarget
